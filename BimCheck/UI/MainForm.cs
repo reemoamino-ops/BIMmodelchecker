@@ -8,8 +8,7 @@ using BimCheck.Revit;
 namespace BimCheck.UI;
 
 /// <summary>
-/// Main window: overview counts, Scan Model, and a results table.
-/// Scanning only reads the model. Auto-Fix is added in a later ticket.
+/// Main window: overview counts, Scan Model (read-only), Auto-Fix Missing Marks (writes, with confirmation), and a results table.
 /// </summary>
 public class MainForm : Form
 {
@@ -21,7 +20,11 @@ public class MainForm : Form
     private readonly Label _missingLabel = new();
     private readonly Label _duplicateLabel = new();
     private readonly Label _summaryLabel = new();
+    private readonly Button _fixButton = new();
     private readonly DataGridView _grid = new();
+
+    private CheckResult? _lastResult;
+    private int _corrected;
 
     public MainForm(Document doc)
     {
@@ -62,15 +65,29 @@ public class MainForm : Form
         _grid.Columns.Add("Mark", "Current Mark");
         _grid.Columns.Add("ErrorType", "Error Type");
 
-        _summaryLabel.Dock = DockStyle.Bottom;
-        _summaryLabel.AutoSize = false;
-        _summaryLabel.Height = 32;
-        _summaryLabel.Padding = new Padding(12, 8, 12, 0);
+        _fixButton.Text = "Auto-Fix Missing Marks";
+        _fixButton.AutoSize = true;
+        _fixButton.Padding = new Padding(8, 4, 8, 4);
+        _fixButton.Enabled = false;
+        _fixButton.Click += OnFixClicked;
+
+        _summaryLabel.AutoSize = true;
         _summaryLabel.Text = "Press Scan Model to check the doors in this project.";
+
+        var bottom = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Bottom,
+            AutoSize = true,
+            Padding = new Padding(12, 8, 12, 8),
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+        };
+        bottom.Controls.Add(_fixButton);
+        bottom.Controls.Add(_summaryLabel);
 
         // Add the fill control first so the docked top and bottom panels keep their space.
         Controls.Add(_grid);
-        Controls.Add(_summaryLabel);
+        Controls.Add(bottom);
         Controls.Add(overview);
 
         ShowCounts(0, 0, 0);
@@ -80,9 +97,7 @@ public class MainForm : Form
     {
         try
         {
-            var doors = DoorCollector.Collect(_doc);
-            var result = MarkChecker.Check(doors);
-            ShowResult(result);
+            RunScan();
         }
         catch (Exception ex)
         {
@@ -91,9 +106,48 @@ public class MainForm : Form
         }
     }
 
+    private void OnFixClicked(object? sender, EventArgs e)
+    {
+        if (_lastResult == null || _lastResult.MissingCount == 0) return;
+
+        var answer = MessageBox.Show(this,
+            $"Assign new marks to {_lastResult.MissingCount} doors that have no Mark?\n\n" +
+            "Doors with existing marks will not change.",
+            "BIM Check", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+        if (answer != DialogResult.Yes) return;
+
+        try
+        {
+            var outcome = DoorMarkWriter.AutoFixMissing(_doc, DoorCollector.Collect(_doc));
+            _corrected = outcome.Fixed;
+
+            string skippedNote = outcome.Skipped > 0
+                ? $"\n{outcome.Skipped} doors were skipped because they changed or cannot be edited."
+                : string.Empty;
+            MessageBox.Show(this, $"Assigned marks to {outcome.Fixed} doors.{skippedNote}",
+                "BIM Check", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+            RunScan();
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this,
+                "Auto-fix failed. The changes were rolled back, so the model is unchanged.\n\n" + ex.Message,
+                "BIM Check", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void RunScan()
+    {
+        var result = MarkChecker.Check(DoorCollector.Collect(_doc));
+        _lastResult = result;
+        ShowResult(result);
+    }
+
     private void ShowResult(CheckResult result)
     {
         ShowCounts(result.TotalDoors, result.MissingCount, result.DuplicateCount);
+        _fixButton.Enabled = result.MissingCount > 0;
 
         _grid.Rows.Clear();
         foreach (var problem in result.Problems)
@@ -108,8 +162,8 @@ public class MainForm : Form
 
         int issueDoors = result.Problems.Count;
         _summaryLabel.Text = issueDoors == 0
-            ? $"No issues found in {result.TotalDoors} doors."
-            : $"{issueDoors} doors have issues. Corrected: 0.";
+            ? $"No issues found in {result.TotalDoors} doors. Corrected: {_corrected}."
+            : $"{issueDoors} doors have issues. Corrected: {_corrected}.";
     }
 
     private void ShowCounts(int total, int missing, int duplicates)
