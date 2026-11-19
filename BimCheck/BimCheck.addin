@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <AddIn Type="Command">
+    <Assembly>BimCheck\BimCheck.dll</Assembly>
+    <ClientId>1f41fd99-2d17-4ad5-9c39-299d930197b2</ClientId>
+    <FullClassName>BimCheck.Commands.BimCheckCommand</FullClassName>
+    <Text>BIM Check</Text>
+    <Description>Checks door Mark parameters for missing and duplicate values.</Description>
+    <VendorId>BIMCHECK</VendorId>
+    <VisibilityMode>NotVisibleInMacroMode</VisibilityMode>
+  </AddIn>
+</RevitAddIns>
