@@ -16,3 +16,6 @@ A mock of the Revit `Document` and `Element` types would prove the mapping witho
 ## To confirm on the owner's machine
 1. The project builds with the .NET 10 SDK and Revit 2027 references.
 2. Scanning a sample project returns one record per door instance, with no entries for door types.
+
+## Update: read path now mock-tested
+`ScanService` (Core) runs the scan through `IDoorSource`. `ScanServiceTests` uses a fake source to check counts, duplicates, empty input, source failure and null input. `RevitDoorSource` wraps `DoorCollector`. The Revit mapping in `DoorCollector` itself is still unmocked and unproven until run in Revit.

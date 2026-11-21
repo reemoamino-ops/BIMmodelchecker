@@ -22,3 +22,6 @@ Nothing here runs. A mock of `Document` (used by `DoorCollector`) would be neede
 1. Build succeeds on .NET 10 with Revit 2027 references.
 2. Scan Model on a sample project: counts match the doors you expect, and each problem row has the right type and colour.
 3. Re-scanning works, and the model is unchanged afterwards.
+
+## Update: scan logic now mock-tested
+Scan Model calls `ScanService.Scan(new RevitDoorSource(...))`. The counts and rows come from the mock-tested path in `ScanServiceTests`. The WinForms layout and the colours are still untested and need a check in Revit.

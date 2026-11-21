@@ -28,3 +28,11 @@ public static class DoorCollector
         return records;
     }
 }
+
+/// <summary>Thin Revit adapter for <see cref="IDoorSource"/>.</summary>
+public sealed class RevitDoorSource : IDoorSource
+{
+    private readonly Document _doc;
+    public RevitDoorSource(Document doc) => _doc = doc ?? throw new ArgumentNullException(nameof(doc));
+    public IReadOnlyList<DoorRecord> ReadDoors() => DoorCollector.Collect(_doc);
+}

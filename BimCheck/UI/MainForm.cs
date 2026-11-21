@@ -139,7 +139,7 @@ public class MainForm : Form
 
     private void RunScan()
     {
-        var result = MarkChecker.Check(DoorCollector.Collect(_doc));
+        var result = ScanService.Scan(new RevitDoorSource(_doc));
         _lastResult = result;
         ShowResult(result);
     }
