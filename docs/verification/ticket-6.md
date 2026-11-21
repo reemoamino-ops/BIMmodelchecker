@@ -1,28 +1,26 @@
 # Ticket #6 verification: Auto-Fix Missing Marks (WRITE PATH)
 
-**Status: not compiled, not run in Revit. Write path NOT proven.** The read-only proofs for other tickets do not cover this one.
+**Status: not compiled, not run. Write logic is covered by mock-based tests, but the real Revit write is NOT proven.**
 
-## What is proven, and only by reading
-The decision logic is in `AutoFixPlanner` (Core, pure C#). Its unit tests in `AutoFixPlannerTests.cs` cover:
-- The spec example: D-001, empty, D-003, empty plans D-002 and D-004 for doors 2 and 4.
-- Existing marks, including whitespace-only and case variants, are never planned.
-- Duplicates are never planned.
-- Planned marks are unique and skip marks already in use.
+## Layers
+1. **Planner** (`AutoFixPlanner`, Core): chooses which blank doors get which marks. Tests: `AutoFixPlannerTests.cs`.
+2. **Runner** (`AutoFixRunner`, Core): applies the plan through `IDoorMarkStore`. Re-checks each door just before writing, skips doors that gained a mark, are read-only or are gone, and rolls back on any failure. Tests: `AutoFixRunnerTests.cs`, using `FakeStore`, which models staged writes, commit and rollback.
+3. **Revit adapter** (`RevitDoorMarkStore`, BimCheck/Revit): maps each store call to the Revit API. **Not mocked.** It is a thin mapping, but it is the one part that touches the real model.
 
-These tests have **not been run** (no .NET SDK here).
+## What the mock tests prove (once run)
+- Only blank doors are written; existing marks are never changed.
+- A door filled after the scan is skipped, not overwritten.
+- A read-only or deleted door is skipped.
+- A failure during writes, or at commit, rolls back. Nothing is published.
+- No transaction is opened when nothing needs fixing.
 
-## What is NOT proven (this is the risk)
-`DoorMarkWriter.AutoFixMissing` changes the model. Its claims are:
-1. It sets `ALL_MODEL_MARK` only on doors that are still blank when re-checked inside the transaction.
-2. It never overwrites an existing mark.
-3. If any step fails, `RollBack()` runs and the model is unchanged.
+## What they do NOT prove
+- That `ParameterSet` / `Transaction` in Revit behave as the adapter assumes.
+- That Revit's rollback actually restores the model.
 
-None of these has been executed. A mock of `Document`, `Transaction`, and `Parameter` would be needed to show claims 1 to 3 without Revit. That mock does not exist yet.
-
-## Required before this ticket closes
-- Owner runs the Core tests on the .NET 10 SDK.
-- Owner tests in Revit 2027 on a copy of a sample project:
+## Still required before this ticket closes
+- Owner runs the Core and Tests projects with the .NET 10 SDK (`dotnet test` in `BimCheck.Tests`).
+- Owner tests in Revit 2027 on a **backup copy** of a sample project:
   - Existing marks unchanged after Auto-Fix.
   - Only blank doors gain a mark.
-  - Forcing a failure (e.g. a read-only Mark) rolls back and leaves the model unchanged, verified by comparing marks before and after.
-- Do not run Auto-Fix on a project without a backup.
+  - Forcing a failure (e.g. a read-only Mark) rolls back, verified by comparing marks before and after.
